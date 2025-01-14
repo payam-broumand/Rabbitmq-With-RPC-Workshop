@@ -37,17 +37,7 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 		private static RabbitmqCommandClient<TEntity> _client;
 
 		public static RabbitmqCommandClient<TEntity> Client
-			=> _client ??= new RabbitmqCommandClient<TEntity>();
-
-		//public static async Task InitializeRabbitComponentAsync(
-		//	string routingKey,
-		//	string replyTo,
-		//	Dictionary<string, string> command)
-		//{
-		//	Thread.Sleep(8000);
-
-		//	await InitializeConfig(routingKey, replyTo, command); 
-		//}
+			=> _client ??= new RabbitmqCommandClient<TEntity>(); 
 
 		public async Task<IReadOnlyList<TEntity>?> GetAllEntitesAsync()
 		{
@@ -65,6 +55,12 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 			return _entity;
 		}
 
+		/// <summary>
+		/// consume (receive) the responses has been sent from server
+		/// we are using switch-case to specify which of the CURD comments is running
+		/// and finaly we consume thw response
+		/// </summary>
+		/// <returns></returns>
 		public async Task ConsumerCommandAsync()
 		{
 			_consumer.ReceivedAsync += (sender, e) =>
@@ -127,6 +123,17 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 			await _channel.BasicConsumeAsync(_queueName, true, _consumer);
 		}
 
+		/// <summary>
+		/// clients can sending themself requests with this method to the server
+		/// server consume client comments and send appopreiate reposnse to that client was sended the request
+		
+		/// in this method we assigning _entites variable to maintain response result
+		/// this variable is a BlockingCollection for concurent environments and
+		/// when web using the take methpd in this state waiting for initializing blocking collection and remove the value exist in collection and return that value
+		
+		/// for take the collections values from blocking collection we using the GetConsumingEnumerable method ans then using it in spread operator instead using for-loop for assigning collection values
+		/// </summary>
+		/// <returns></returns>
 		public async Task PublishCommandAsync()
 		{
 			/*
