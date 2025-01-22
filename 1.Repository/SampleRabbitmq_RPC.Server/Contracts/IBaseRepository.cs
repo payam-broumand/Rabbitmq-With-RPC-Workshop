@@ -8,8 +8,11 @@ namespace SampleRabbitmq_RPC.Repository.Contracts
 
 		IReadOnlyList<TEntity> GetAll();
 
+		TEntity Create(TEntity entity);
+
 		TEntity? Edit(int id, TEntity model);
 
-		void Delete(int id);
+		TEntity? Delete(int id);
+		int CountEntites();
 	}
 }

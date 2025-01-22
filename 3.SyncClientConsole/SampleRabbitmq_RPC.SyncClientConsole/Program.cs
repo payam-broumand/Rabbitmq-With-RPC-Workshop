@@ -1,9 +1,8 @@
-﻿using SampleRabbitmq_RPC.Common.BaseContract;
-using SampleRabbitmq_RPC.Common.Common;
+﻿using SampleRabbitmq_RPC.Common.RabbitCommnads;
 using SampleRabbitmq_RPC.Repository.Model;
 
 // waiting while server completely loading
-Thread.Sleep(6000);
+Thread.Sleep(4000);
 
 /*
 	you must precisely assigning routing-key and reply-to in client
@@ -19,25 +18,10 @@ Thread.Sleep(6000);
  */
 string routingKey = "rpc.get.category.request";
 string replyTo = "rpc.get.category.sync.client.request";
+
+ClientCrudService<Category> crudService = ClientCrudService<Category>.CrudComment;
+await crudService.InitializeRabbitConfiguration(routingKey, replyTo);
 bool toBeContinue = false;
-
-// create new client instance for sending request to server with rabbit 
-BaseRabbitmq<Category> baseRabbitmq = new RabbitmqFactory<Category>();
-IRabbitmqCommand<Category> rabbitmqCommand = baseRabbitmq.SetRabbitmqCommand("client");
-IRabbitmqClientCommand<Category>? _client = rabbitmqCommand as IRabbitmqClientCommand<Category>;
-if(_client is null)
-{
-	Console.WriteLine("Client turn it down please try later ...");
-	return;
-}
-
-// initialize base rabbitmq configuration like connection and channel
-await _client.InitializeConfig(routingKey, replyTo, RabbitCommandType.client);
-
-// invoke client consumer
-await _client.ConsumerCommandAsync();
-
-Console.WriteLine("client is ready ...");
 
 do
 {
@@ -46,85 +30,120 @@ do
 		"""
 		1. Category List
 		2. Find Category By id
+		3. Update Category By Id
+		4. Delete Category By Id
+		5. Add New Category
 		------------------------------------
 		Enter your choice: 
 		""";
 	Console.Write(menu);
-	int selectedItem = int.TryParse(Console.ReadLine(), out int id)
-		? id : 0; 
-
+	int selectedItem = int.TryParse(Console.ReadLine(), out int id) ? id : 0;
 	switch (selectedItem)
 	{
 		case 1:
-			await GetCategorireList(_client);
+			IReadOnlyList<Category>? categories = await crudService.GetEntitesList();
+			if (categories is not null)
+			{
+				foreach (var item in categories)
+				{
+					Console.WriteLine($"{item.Id}: {item.Title}");
+				}
+			}
+			else
+			{
+				Console.WriteLine("not any category found ...");
+			}
+
 			break;
 
 		case 2:
-			await FindCategoryById(_client);
+			Console.Write("\nEnter category id: ");
+			int categoryId = int.TryParse(Console.ReadLine(), out id) ? id : 0;
+			Category? category = await crudService.FindEntityByIdAsync(categoryId);
+
+			if (category is not null && category.Id > 0)
+			{
+				Console.WriteLine($"{category.Id}: {category.Title}");
+			}
+			else
+			{
+				Console.WriteLine("category not found");
+			}
+			break;
+
+		case 3:
+			Console.Write("\nEnter category id to update: ");
+			categoryId = int.TryParse(Console.ReadLine(), out id) ? id : 0;
+			category = await crudService.FindEntityByIdAsync(categoryId);
+
+			if (category is null || category.Id == 0)
+			{
+				Console.WriteLine("category not found ...");
+				break;
+			}
+
+			Console.Write("Enter new category title: ");
+			string? categoryName = Console.ReadLine();
+			if (string.IsNullOrWhiteSpace(categoryName))
+			{
+				Console.WriteLine("Invalid category title");
+				break;
+			}
+
+			category.Title = categoryName;
+			Category? editedCategory = await crudService.UpdateEntnityAsync(categoryId, category);
+			if (editedCategory is not null)
+			{
+				Console.WriteLine($"Category Updated {editedCategory.Id}: {editedCategory.Title}");
+			}
+			else
+			{
+				Console.WriteLine("category update error");
+			}
+			break;
+
+		case 4:
+			Console.Write("\nEnter category id to delete: ");
+			categoryId = int.TryParse(Console.ReadLine(), out id) ? id : 0; 
+
+			Category? deletedCategory = await crudService.DeleteEntityAsync(categoryId);
+			if (deletedCategory is not null && deletedCategory.Id > 0)
+			{
+				Console.WriteLine($"Category {deletedCategory.Id}: {deletedCategory.Title} Deleted Successfully");
+			}
+			else
+			{
+				Console.WriteLine("category not found to delete");
+			}
+			break;
+
+		case 5:
+			Console.Write("Enter new category title: ");
+			string? title = Console.ReadLine();
+			if(string.IsNullOrEmpty(title))
+			{
+				Console.WriteLine("invalid category title");
+				break;
+			}
+
+			Category newCategory = new Category { Title = title };
+
+			Category? categoryCreated = await crudService.CreateEntityAsync(newCategory);
+			if(categoryCreated is not null)
+			{
+				Console.WriteLine("New Category created successfully");
+			}
+			else
+			{
+				Console.WriteLine("error in adding new category");
+			}
 			break;
 
 		default:
 			Console.WriteLine("invalue item number ...\n");
 			break;
-	} 
+	}
 
 	Console.Write("\nDo you want to contine (y/n): ");
 	toBeContinue = Console.ReadLine() == "y";
-} while (toBeContinue);   
-
-
-// getting categories list by setting command to getakk 
-static async Task GetCategorireList(IRabbitmqClientCommand<Category> client)
-{
-	// with dictionary we define command type (CRUD) and any more required data
-	Dictionary<string, string> command = new Dictionary<string, string>
-	{
-		{ "command", "getall" }
-	};
-
-	// set client command (CRUD commands)
-	client.Command = command;
-
-	/*
-		after create client and initialize rabbit config
-		we sending first request with rabbit to server with synchronous method
-	 */
-	IReadOnlyList<Category> categories = await client.GetAllEntitesAsync();
-	foreach (var item in categories)
-	{
-		Console.WriteLine($"{item.Id}: {item.Title}");
-	}
-	Console.WriteLine();
-}
-
-// getting category by id by setting command to getbyid
-static async Task FindCategoryById(IRabbitmqClientCommand<Category>? client)
-{
-	Console.Write("\nEnter category id: ");
-	int categoryId = int.TryParse(Console.ReadLine(), out int id) ? id : 0;
-
-	// with dictionary we define command type (CRUD) and any more required data
-	Dictionary<string, string> command = new Dictionary<string, string>
-	{
-		{ "command", "getbyid" },
-		{ "data", categoryId.ToString() }
-	};
-
-	// set client command (CRUD commands)
-	client.Command = command;
-
-	/*
-		after create client and initialize rabbit config
-		we sending first request with rabbit to server with synchronous method
-	 */
-	Category? category = await client.GetEntityById(categoryId);
-
-	if (category is not null)
-	{
-		Console.WriteLine($"{category.Id}: {category.Title}");
-	}
-	else
-	{
-		Console.WriteLine("category not found");
-	}
-}
+} while (toBeContinue); 

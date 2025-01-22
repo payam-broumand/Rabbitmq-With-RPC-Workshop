@@ -2,8 +2,8 @@
 using SampleRabbitmq_RPC.Common.BaseContract;
 using SampleRabbitmq_RPC.Common.Common;
 using SampleRabbitmq_RPC.Repository.Model;
-using System.Collections.Concurrent; 
-using System.Text.Json;
+using System.Collections.Concurrent;
+using Newtonsoft.Json;
 
 namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 {
@@ -37,7 +37,7 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 		private static RabbitmqCommandClient<TEntity> _client;
 
 		public static RabbitmqCommandClient<TEntity> Client
-			=> _client ??= new RabbitmqCommandClient<TEntity>(); 
+			=> _client ??= new RabbitmqCommandClient<TEntity>();
 
 		public async Task<IReadOnlyList<TEntity>?> GetAllEntitesAsync()
 		{
@@ -46,10 +46,29 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 			return _entityList;
 		}
 
-		public async Task<TEntity?> GetEntityById(int? id)
+		public async Task<TEntity?> GetEntityByIdAsync()
 		{
-			if (id is null or <= 0) return null;
+			await PublishCommandAsync();
 
+			return _entity;
+		}
+
+		public async Task<TEntity?> UpdateEntityAsync()
+		{
+			await PublishCommandAsync();
+
+			return _entity;
+		}
+
+		public async Task<TEntity?> DeleteEntityAsync()
+		{
+			await PublishCommandAsync();
+
+			return _entity;
+		}
+
+		public async Task<TEntity?> CreateEntityAsync(TEntity entity)
+		{
 			await PublishCommandAsync();
 
 			return _entity;
@@ -66,7 +85,7 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 			_consumer.ReceivedAsync += (sender, e) =>
 			{
 				byte[]? responseBytes = null;
-				responseBytes = e.Body.ToArray(); 
+				responseBytes = e.Body.ToArray();
 
 				string commandType = !string.IsNullOrWhiteSpace(_command["command"])
 					? _command["command"]
@@ -74,33 +93,13 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 
 				switch (commandType)
 				{
-					case "getbyid": 
-						TEntity? entity = null;
-						string entityString = System.Text.Encoding.UTF8.GetString(responseBytes);
-						if (!string.IsNullOrEmpty(entityString))
-						{
-							entity = JsonSerializer.Deserialize<TEntity>(entityString);
-						}
-
-						if (entity is not null)
-						{
-							_entites.Add(entity);
-						}
-						else
-						{
-							Console.WriteLine("Entity not found ...");
-							Type entityType = typeof(TEntity);
-							object? entityInstace = Activator.CreateInstance(entityType);
-							_entites.Add((TEntity)entityInstace);
-						} 
-						break;
-
 					case "getall":
 						IReadOnlyList<TEntity>? entites = new List<TEntity>();
 
 						if (responseBytes is not null)
 						{
-							entites = JsonSerializer.Deserialize<IReadOnlyList<TEntity>>(System.Text.Encoding.UTF8.GetString(responseBytes));
+							string responseString = System.Text.Encoding.UTF8.GetString(responseBytes);
+							entites = JsonConvert.DeserializeObject<IReadOnlyList<TEntity>>(responseString);
 						}
 
 						if (entites is not null)
@@ -113,6 +112,13 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 						}
 						break;
 
+					case "getbyid":
+					case "create":
+					case "update":
+					case "delete":
+						ConsumeEntityTypeResponse(responseBytes);
+						break;
+
 					default:
 						break;
 				}
@@ -123,14 +129,35 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 			await _channel.BasicConsumeAsync(_queueName, true, _consumer);
 		}
 
+		private void ConsumeEntityTypeResponse(byte[]? responseBytes)
+		{
+			TEntity? entity = null;
+			string entityString = System.Text.Encoding.UTF8.GetString(responseBytes);
+			if (!string.IsNullOrEmpty(entityString))
+			{
+				entity = JsonConvert.DeserializeObject<TEntity>(entityString);
+			}
+
+			if (entity is not null)
+			{
+				_entites.Add(entity);
+			}
+			else
+			{
+				Type entityType = typeof(TEntity);
+				object? entityInstace = Activator.CreateInstance(entityType);
+				_entites.Add((TEntity)entityInstace);
+			}
+		}
+
 		/// <summary>
 		/// clients can sending themself requests with this method to the server
 		/// server consume client comments and send appopreiate reposnse to that client was sended the request
-		
+
 		/// in this method we assigning _entites variable to maintain response result
 		/// this variable is a BlockingCollection for concurent environments and
 		/// when web using the take methpd in this state waiting for initializing blocking collection and remove the value exist in collection and return that value
-		
+
 		/// for take the collections values from blocking collection we using the GetConsumingEnumerable method ans then using it in spread operator instead using for-loop for assigning collection values
 		/// </summary>
 		/// <returns></returns>
@@ -147,14 +174,14 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 				If you attempt to take an item from it after this and the collection 
 				is empty, you'll get this error.
 			 */
-			_entites = new BlockingCollection<TEntity>(); 
+			_entites = new BlockingCollection<TEntity>();
 
 			var props = new BasicProperties();
 			props.ReplyTo = _replyTo;
 
 			// serialize and mke byte array from client commnd and send it to server
 			byte[] commandBytes = System.Text.Encoding.UTF8.GetBytes(
-				JsonSerializer.Serialize(_command));
+				JsonConvert.SerializeObject(_command));
 
 			string commandType = !string.IsNullOrWhiteSpace(_command["command"])
 				? _command["command"]
@@ -163,11 +190,25 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 			switch (commandType)
 			{
 				case "getbyid":
-					props.CorrelationId = _command["data"]; 
+					props.CorrelationId = _command["data"];
 					break;
 
 				case "getall":
 					Console.WriteLine("Wait for receiving data ...");
+					break;
+
+				case "update":
+					props.CorrelationId = _command["data"];
+					Console.WriteLine("update command sended to server");
+					break;
+
+				case "delete":
+					props.CorrelationId = _command["data"];
+					Console.WriteLine("delete command sended to server");
+					break;
+
+				case "create":
+					Console.WriteLine("adding new entity command received");
 					break;
 
 				default:
@@ -178,12 +219,15 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 
 			switch (commandType)
 			{
-				case "getbyid":
-					_entity = _entites.Take();
-					break;
-
 				case "getall":
 					_entityList = [.. _entites.GetConsumingEnumerable()];
+					break;
+
+				case "getbyid":
+				case "create":
+				case "update":
+				case "delete":
+					_entity = _entites.Take();
 					break;
 
 				default:

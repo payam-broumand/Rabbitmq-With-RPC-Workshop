@@ -4,5 +4,6 @@ namespace SampleRabbitmq_RPC.Repository.Contracts
 {
 	public interface ICategoryRepository : IBaseRepository<Category>
 	{
+		Task<Category?> GetCategoryIncludeCourses(int id);
 	}
 }

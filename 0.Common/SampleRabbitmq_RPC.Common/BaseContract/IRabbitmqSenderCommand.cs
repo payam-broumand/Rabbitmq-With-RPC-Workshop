@@ -1,4 +1,5 @@
-﻿using SampleRabbitmq_RPC.Repository.Model;
+﻿using SampleRabbitmq_RPC.Repository.Contracts;
+using SampleRabbitmq_RPC.Repository.Model;
 
 namespace SampleRabbitmq_RPC.Common.BaseContract
 {
@@ -9,6 +10,8 @@ namespace SampleRabbitmq_RPC.Common.BaseContract
 	/// <typeparam name="TEntity">refers to that entity we want to person CRUD operation on it</typeparam>
 	public interface IRabbitmqSenderCommand<TEntity> : IRabbitmqCommand<TEntity> where TEntity : BaseEntity
 	{
+		//public IBaseRepository<TEntity> CommandServerRepository { get; set; }
 
+		public AcademyDbContext DbContext { get; set; }
 	}
 }

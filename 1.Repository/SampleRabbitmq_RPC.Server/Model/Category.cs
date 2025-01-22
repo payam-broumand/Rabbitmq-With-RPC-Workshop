@@ -4,6 +4,6 @@
 	{
 		public string Title { get; set; } = "null";
 
-		public IReadOnlyCollection<Course> Courses { get; set; } = [];
+		public IReadOnlyCollection<Course>? Courses { get; set; }
 	}
 }

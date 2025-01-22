@@ -18,13 +18,24 @@ namespace SampleRabbitmq_RPC.Repository.Repositories
 			_dbContext.Database.EnsureCreated();
 		}
 
-		public void Delete(int id)
+		public TEntity Create(TEntity entity)
 		{
-			TEntity? entity = GetById(id);
-			if (entity is null) return;
+			_dbSet.Add(entity);
 
-			_dbSet.Remove(entity);
 			_dbContext.SaveChanges();
+
+			return entity;
+		}
+
+		public TEntity? Delete(int id)
+		{
+			TEntity? entityToDelete = GetById(id);
+			if (entityToDelete == null) return null; 
+			 
+			_dbSet.Remove(entityToDelete);
+			_dbContext.SaveChanges();
+
+			return entityToDelete;
 		}
 
 		public TEntity? Edit(int id, TEntity model)
@@ -32,14 +43,18 @@ namespace SampleRabbitmq_RPC.Repository.Repositories
 			TEntity? entity = GetById(id);
 			if (entity is null) return null;
 
-			_dbSet.Update(entity);
+			_dbSet.Entry(entity).State = EntityState.Detached;
+
+			_dbSet.Update(model);
 			_dbContext.SaveChanges();
 
-			return entity;
+			return model;
 		}
 
 		public IReadOnlyList<TEntity> GetAll() => _dbSet.ToList();
 
 		public TEntity? GetById(int id) => _dbSet.Find(id);
+
+		public int CountEntites() => _dbSet.Count();
 	}
 }

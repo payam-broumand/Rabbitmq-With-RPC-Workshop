@@ -10,8 +10,14 @@ namespace SampleRabbitmq_RPC.Common.BaseContract
 	public interface IRabbitmqClientCommand<TEntity> : IRabbitmqCommand<TEntity>
 		where TEntity : BaseEntity
 	{
-		Task<IReadOnlyList<TEntity>> GetAllEntitesAsync();
+		Task<IReadOnlyList<TEntity>?> GetAllEntitesAsync();
 
-		Task<TEntity?> GetEntityById(int? id);
+		Task<TEntity?> GetEntityByIdAsync();
+
+		Task<TEntity?> CreateEntityAsync(TEntity entity);
+
+		Task<TEntity?> UpdateEntityAsync();
+		
+		Task<TEntity?> DeleteEntityAsync();
 	}
 }

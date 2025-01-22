@@ -3,7 +3,7 @@ using SampleRabbitmq_RPC.Common.BaseContract;
 using SampleRabbitmq_RPC.Common.Common;
 using SampleRabbitmq_RPC.Repository.Contracts;
 using SampleRabbitmq_RPC.Repository.Model;
-using System.Text.Json;
+using Newtonsoft.Json;
 
 namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 {
@@ -24,23 +24,24 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 
 		public TEntity? Entity { get; private set; }
 
-		private static IBaseRepository<TEntity> _repository; 
+		private static IBaseRepository<TEntity>? _repository;
 
 		private static RabbitmqCommandServer<TEntity> _server;
 
-		public static IBaseRepository<TEntity> Repository
+		public static IBaseRepository<TEntity>? CommandServerRepository
 		{
 			get => _repository;
 			set => _repository ??= value;
 		}
 
-		public static RabbitmqCommandServer<TEntity> Server
-			=> _server ??= new RabbitmqCommandServer<TEntity>(Repository); 
+		public AcademyDbContext DbContext { get; set; }
 
-		private RabbitmqCommandServer(IBaseRepository<TEntity> repository)
+		public static RabbitmqCommandServer<TEntity> Server
+			=> _server ??= new RabbitmqCommandServer<TEntity>();
+
+		private RabbitmqCommandServer()
 		{
-			_repository = repository;
-		}  
+		}
 
 		/// <summary>
 		/// consume responses sended from server
@@ -55,9 +56,10 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 				byte[]? resposeBytes = null;
 				resposeBytes = e.Body.ToArray();
 				var requestProps = e.BasicProperties;
+				_replyTo = requestProps.ReplyTo;
 
 				string commandDictioanry = System.Text.Encoding.UTF8.GetString(resposeBytes);
-				_command = JsonSerializer.Deserialize<Dictionary<string, string>>(commandDictioanry) ?? new Dictionary<string, string>();
+				_command = JsonConvert.DeserializeObject<Dictionary<string, string>>(commandDictioanry) ?? new Dictionary<string, string>();
 
 				string commandType = !string.IsNullOrWhiteSpace(_command["command"])
 					? _command["command"]
@@ -67,16 +69,32 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 				{
 					case "getbyid":
 						_correlationId = requestProps.CorrelationId;
-						_replyTo = requestProps.ReplyTo;
 						Console.WriteLine($"Entity with id: {_correlationId} received ...");
 						await PublishCommandAsync();
 
 						break;
 
 					case "getall":
-						_replyTo = requestProps.ReplyTo;
+						Console.WriteLine("Get all entites command received ...");
 						await PublishCommandAsync();
 						break;
+
+					case "create": 
+						Console.WriteLine("Create new entity command received ...");
+						await PublishCommandAsync();
+						break;
+
+					case "update":
+						_correlationId = requestProps.CorrelationId; 
+						Console.WriteLine("Update comand received ...");
+						await PublishCommandAsync();
+						break;
+
+					case "delete":
+						_correlationId = requestProps.CorrelationId; 
+						Console.WriteLine("Delete comand received ...");
+						await PublishCommandAsync();
+						break; 
 
 					default:
 						break;
@@ -106,22 +124,110 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 			{
 				case "getbyid":
 					responseProps.CorrelationId = _correlationId;
-					int entityId = int.TryParse(_command["data"], out int id) ? id : 0;
-					TEntity? entity = _repository.GetById(entityId);
+					FindEntityByCorrelationId(out int id, out TEntity? entity);
 
 					if (entity is not null)
 					{
 						responseBytes = System.Text.Encoding.UTF8.GetBytes(
-							JsonSerializer.Serialize(entity));
+							JsonConvert.SerializeObject(entity));
+						Console.WriteLine($"Entity has been sent\n");
 					}
-					Console.WriteLine($"Entity by id: {entityId} has been sent\n");
+					else
+					{
+						Console.WriteLine("Entity not found ...");
+					}
 					break;
 
 				case "getall":
 					IReadOnlyList<TEntity> entities = _repository.GetAll();
 					responseBytes = System.Text.Encoding.UTF8.GetBytes(
-						JsonSerializer.Serialize(entities));
+						JsonConvert.SerializeObject(entities));
 					Console.WriteLine("Entity list has been sent");
+					break;
+
+				case "create":
+					TEntity? entityToAdd = null;
+
+					// check if create new entity command is existt and has valid data
+					if (_command.ContainsKey("entity_to_add") && !string.IsNullOrEmpty(_command["entity_to_add"]))
+					{
+						TEntity? newEntity = JsonConvert.DeserializeObject<TEntity>(_command["entity_to_add"]);
+						if (newEntity is null)
+						{
+							Console.WriteLine("New entity received is null");
+							break;
+						}
+
+						entityToAdd = _repository.Create(newEntity);
+					}
+
+					// check created new entity not null and repository create method has been run successfully
+					if (entityToAdd is not null)
+					{
+						string entityString = JsonConvert.SerializeObject(entityToAdd);
+						responseBytes = System.Text.Encoding.UTF8.GetBytes(entityString);
+					}
+					else
+					{
+						Console.WriteLine("error in adding new entity");
+						break;
+					}
+					break;
+
+				case "update":
+					responseProps.CorrelationId = _correlationId;
+					FindEntityByCorrelationId(out id, out entity);
+					if (entity is null)
+					{
+						Console.WriteLine("entity not found to update ...");
+						break;
+					}
+
+					TEntity? updatedEntity = null;
+					if (_command.ContainsKey("edited_entity") && !string.IsNullOrEmpty(_command["edited_entity"]))
+					{
+						TEntity? editedEntity = JsonConvert.DeserializeObject<TEntity>(_command["edited_entity"]);
+
+						if (editedEntity is null)
+						{
+							Console.WriteLine("Edited Entity is null");
+						}
+						else
+						{
+							updatedEntity = _repository.Edit(id, editedEntity);
+						}
+					}
+
+					if (updatedEntity is not null)
+					{
+						responseBytes = System.Text.Encoding.UTF8.GetBytes(
+							JsonConvert.SerializeObject(updatedEntity));
+						Console.WriteLine("entity has been updated successfully ...\n");
+					}
+					else
+					{
+						Console.WriteLine("error in entity updating\n");
+					}
+					break;
+
+				case "delete":
+					responseProps.CorrelationId = _correlationId;
+
+					// calling repository delete method
+					int entityId = int.TryParse(_correlationId, out id) ? id : 0;
+					TEntity? deletedEntity = _repository.Delete(entityId); 
+
+					// check repository delete method has been running successfully
+					if (deletedEntity is not null)
+					{
+						responseBytes = System.Text.Encoding.UTF8.GetBytes(
+							JsonConvert.SerializeObject(deletedEntity));
+						Console.WriteLine("entity has been deleted successfully ...\n");
+					}
+					else
+					{
+						Console.WriteLine("error in deleting entity\n");
+					}
 					break;
 
 				default:
@@ -130,7 +236,27 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 
 			// publish response to that whose client that binded with repl-to routing key
 			await _channel.BasicPublishAsync(exchangeName, _replyTo, mandatory: true,
-				 basicProperties: responseProps, responseBytes); 
-		} 
+				 basicProperties: responseProps, responseBytes);
+		}
+
+		private void FindEntityByCorrelationId(out int entityId, out TEntity? entity)
+		{
+			if (string.IsNullOrEmpty(_correlationId))
+			{
+				entity = null;
+				entityId = 0;
+				return;
+			}
+
+			entityId = int.TryParse(_correlationId, out int id) ? id : 0;
+			if (entityId <= 0)
+			{
+				entity = null;
+				entityId = 0;
+				return;
+			}
+
+			entity = _repository.GetById(entityId);
+		}
 	}
 }
