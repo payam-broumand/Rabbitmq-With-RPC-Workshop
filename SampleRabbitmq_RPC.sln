@@ -7,7 +7,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "1.Repository", "1.Repositor
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "2.sender", "2.sender", "{5D5D32DC-855B-4FE9-9D8D-A094FCD1EF07}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "4.AsyncSlient", "4.AsyncSlient", "{B2F5B07A-D17A-43D5-9EA1-C9008E73FFC9}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "4.AsyncClient", "4.AsyncClient", "{B2F5B07A-D17A-43D5-9EA1-C9008E73FFC9}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "0.Common", "0.Common", "{B557D8A1-F13A-4FA1-8997-77B85E8E8F5C}"
 EndProject
@@ -20,6 +20,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleRabbitmq_RPC.SyncSender", "2.SyncSender\SampleRabbitmq_RPC.SyncSender\SampleRabbitmq_RPC.SyncSender.csproj", "{A8EAC8BD-6B8E-41EE-B75A-A9ED98C09170}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleRabbitmq_RPC.SyncClientConsole", "3.SyncClientConsole\SampleRabbitmq_RPC.SyncClientConsole\SampleRabbitmq_RPC.SyncClientConsole.csproj", "{A9A77EE3-4D5C-4337-B600-5BF996F0CD07}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleRabbitmq_RPC.AsyncClientConsole", "4.AsyncClientConsole\SampleRabbitmq_RPC.AsyncClientConsole\SampleRabbitmq_RPC.AsyncClientConsole.csproj", "{28F09B38-63A5-465C-B08A-63D4058FA2C4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -43,6 +45,10 @@ Global
 		{A9A77EE3-4D5C-4337-B600-5BF996F0CD07}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A9A77EE3-4D5C-4337-B600-5BF996F0CD07}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A9A77EE3-4D5C-4337-B600-5BF996F0CD07}.Release|Any CPU.Build.0 = Release|Any CPU
+		{28F09B38-63A5-465C-B08A-63D4058FA2C4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{28F09B38-63A5-465C-B08A-63D4058FA2C4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{28F09B38-63A5-465C-B08A-63D4058FA2C4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{28F09B38-63A5-465C-B08A-63D4058FA2C4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -52,5 +58,6 @@ Global
 		{8A03FA29-E01D-4550-9F9B-5A50D467DC0F} = {74CB6D31-3595-4D11-B277-EE0E26D13BED}
 		{A8EAC8BD-6B8E-41EE-B75A-A9ED98C09170} = {5D5D32DC-855B-4FE9-9D8D-A094FCD1EF07}
 		{A9A77EE3-4D5C-4337-B600-5BF996F0CD07} = {9E4D86DC-062B-49E1-9911-EE7DEDB9987E}
+		{28F09B38-63A5-465C-B08A-63D4058FA2C4} = {B2F5B07A-D17A-43D5-9EA1-C9008E73FFC9}
 	EndGlobalSection
 EndGlobal

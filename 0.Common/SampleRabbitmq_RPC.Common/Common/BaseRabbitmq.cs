@@ -74,6 +74,7 @@ namespace SampleRabbitmq_RPC.Common.Common
 				{
 					"sender" => RabbitmqCommandServer<TEntity>.Server,
 					"client" => RabbitmqCommandClient<TEntity>.Client,
+					"clientasync" => RabbitmqCommandClientAsync<TEntity>.CommandClient,
 					_ => RabbitmqCommandClient<TEntity>.Client
 				};
 

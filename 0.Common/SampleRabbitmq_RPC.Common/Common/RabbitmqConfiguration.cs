@@ -17,6 +17,7 @@ namespace SampleRabbitmq_RPC.Common.Common
 		protected string _routingKey = string.Empty;
 		protected string _replyTo = string.Empty;
 		protected string _correlationId = string.Empty;
+
 		protected Dictionary<string, string> _command = new();
 
 		public Dictionary<string, string> Command
@@ -43,6 +44,7 @@ namespace SampleRabbitmq_RPC.Common.Common
 			string replyTo,
 			RabbitCommandType commandType)
 		{
+			// set Rabbitmq base configuration
 			_connectionFactory = new ConnectionFactory()
 			{
 				HostName = "localhost"
@@ -52,19 +54,35 @@ namespace SampleRabbitmq_RPC.Common.Common
 			_routingKey = routingkey;
 			_replyTo = replyTo;
 
+			// Exchange Declare with Topic exchange type
 			await _channel.ExchangeDeclareAsync(exchangeName, ExchangeType.Topic);
 
+			// Declare Queue and getting queue name after declaring the queue
+			// Rabbitmq set accident name to queue and we can return it by QueueName property
 			_queueName = _channel.QueueDeclareAsync().Result.QueueName;
 			string routingKeyName = commandType == RabbitCommandType.sender ? routingkey : replyTo;
 			await _channel.QueueBindAsync(_queueName, exchangeName, routingKeyName);
 
+			// set consumer member value with new EventBasicConsume instance
+			// and call received event separately in client and server to
+			// consume received messages from server or client
 			_consumer = new AsyncEventingBasicConsumer(_channel);
-		} 
+		}
 	}
 
 	public enum RabbitCommandType : byte
 	{
 		sender,
-		client
+		client,
+		clientasync
+	}
+
+	public enum CrudCommand : byte
+	{
+		getall,
+		getbyid,
+		create,
+		update,
+		delete
 	}
 }
