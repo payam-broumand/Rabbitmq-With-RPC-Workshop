@@ -14,6 +14,8 @@ internal class Program
 		// waiting while server completely loading
 		Thread.Sleep(4000);
 
+		Console.WriteLine("Async Console Client is ready ...");
+
 		/*
 			You must precisely assiging routing key and reply-to
 			routing key referes to the server routing key and

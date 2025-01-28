@@ -167,6 +167,8 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 					break;
 			}
 
+			// add commands list to the main client command request
+			// we send commands list to the server as part of the main command
 			string commandsList = JsonConvert.SerializeObject(CommandConfig.CommandsList);
 			if (_command.ContainsKey("command_list"))
 				_command["command_list"] = commandsList;

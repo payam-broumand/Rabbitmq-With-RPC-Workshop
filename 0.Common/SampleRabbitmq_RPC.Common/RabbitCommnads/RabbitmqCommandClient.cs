@@ -23,9 +23,14 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 		IRabbitmqClientCommand<TEntity>
 		where TEntity : BaseEntity
 	{
+		private CrudCommand _crudCommand;
+
 		private BlockingCollection<TEntity> _entites = [];
 
 		private TEntity? _entity { get; set; }
+
+		// getting singleton command config instance
+		public CommandConfig CommandConfig => CommandConfig.GetCommandConfig;
 
 		private List<TEntity> _entityList = new List<TEntity>();
 
@@ -87,13 +92,16 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 				byte[]? responseBytes = null;
 				responseBytes = e.Body.ToArray();
 
-				string commandType = !string.IsNullOrWhiteSpace(_command["command"])
-					? _command["command"]
-					: string.Empty;
+				// access correlation for defining whose command response must be consuming
+				var basicProps = e.BasicProperties;
+				var correlationId = basicProps.CorrelationId;
 
-				switch (commandType)
+				Guid commandGuid = Guid.Parse(correlationId);
+				CrudCommand crudCommand = CommandConfig[commandGuid];
+
+				switch (crudCommand)
 				{
-					case "getall":
+					case CrudCommand.getall:
 						IReadOnlyList<TEntity>? entites = new List<TEntity>();
 
 						if (responseBytes is not null)
@@ -112,10 +120,10 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 						}
 						break;
 
-					case "getbyid":
-					case "create":
-					case "update":
-					case "delete":
+					case CrudCommand.getbyid:
+					case CrudCommand.create:
+					case CrudCommand.update:
+					case CrudCommand.delete:
 						ConsumeEntityTypeResponse(responseBytes);
 						break;
 
@@ -123,6 +131,7 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 						break;
 				}
 
+				CommandConfig.Remove(commandGuid);
 				return Task.CompletedTask;
 			};
 
@@ -164,10 +173,10 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 		public async Task PublishCommandAsync()
 		{
 			/*
-				create new BlockCollection instace after every adding items to 
-				BlockingCollection beacase when adding collections of items to
-				BlockingCollection after that we must incoke CompleteAdding method
-				to return callback and showing collection items
+				create new BlockCollection instace after every assigning values to 
+				the BlockingCollection beacase when adding collections of items to
+				BlockingCollection after that we must invoke CompleteAdding method
+				to return callback and display collection items
 				When you call CompleteAdding on a BlockingCollection, 
 				it signifies that no more items will be added. 
 				
@@ -179,54 +188,74 @@ namespace SampleRabbitmq_RPC.Common.RabbitCommnads
 			var props = new BasicProperties();
 			props.ReplyTo = _replyTo;
 
-			// serialize and mke byte array from client commnd and send it to server
-			byte[] commandBytes = System.Text.Encoding.UTF8.GetBytes(
-				JsonConvert.SerializeObject(_command));
-
+			/*
+				- getting command type from client request command
+				- convert client command to crud command enum
+				- set client command to commands list
+				- return added client command index and send it with request
+					as correlation id to the server
+			 */
 			string commandType = !string.IsNullOrWhiteSpace(_command["command"])
 				? _command["command"]
-				: "getall";
+				: CrudCommand.getall.ToString();
+			_crudCommand = (CrudCommand)Enum.Parse(typeof(CrudCommand), commandType);
 
-			switch (commandType)
+			// using GUID for current command request
+			Guid commandKey = CommandConfig.Add(_crudCommand);
+			props.CorrelationId = commandKey.ToString();
+
+			switch (_crudCommand)
 			{
-				case "getbyid":
-					props.CorrelationId = _command["data"];
+				case CrudCommand.getbyid:
+					Console.WriteLine("Waiting for getting entity by id ...");
 					break;
 
-				case "getall":
-					Console.WriteLine("Wait for receiving data ...");
+				case CrudCommand.getall:
+					Console.WriteLine("Waiting for receiving data ...");
 					break;
 
-				case "update":
-					props.CorrelationId = _command["data"];
-					Console.WriteLine("update command sended to server");
+				case CrudCommand.update: 
+					Console.WriteLine("update command send to server");
 					break;
 
-				case "delete":
-					props.CorrelationId = _command["data"];
+				case CrudCommand.delete: 
 					Console.WriteLine("delete command sended to server");
 					break;
 
-				case "create":
-					Console.WriteLine("adding new entity command received");
+				case CrudCommand.create:
+					Console.WriteLine("adding new entity has been sent to the server");
 					break;
 
 				default:
 					break;
 			}
 
+			// add commands list to the main client command request
+			// we send commands list to the server as part of the main command
+			string commandsList = JsonConvert.SerializeObject(CommandConfig.CommandsList);
+			if (_command.ContainsKey("command_list"))
+				_command["command_list"] = commandsList;
+			else
+			{
+				_command.Add("command_list", commandsList);
+			}
+
+			// serialize and mke byte array from client commnd and send it to server
+			byte[] commandBytes = System.Text.Encoding.UTF8.GetBytes(
+				JsonConvert.SerializeObject(_command));
+
 			await _channel.BasicPublishAsync(exchangeName, _routingKey, mandatory: true, basicProperties: props, commandBytes);
 
-			switch (commandType)
+			switch (_crudCommand)
 			{
-				case "getall":
+				case CrudCommand.getall:
 					_entityList = [.. _entites.GetConsumingEnumerable()];
 					break;
 
-				case "getbyid":
-				case "create":
-				case "update":
-				case "delete":
+				case CrudCommand.getbyid:
+				case CrudCommand.create:
+				case CrudCommand.update:
+				case CrudCommand.delete:
 					_entity = _entites.Take();
 					break;
 

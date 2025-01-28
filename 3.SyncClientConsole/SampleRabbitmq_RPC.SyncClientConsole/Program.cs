@@ -22,7 +22,7 @@ string replyTo = "rpc.get.category.sync.client.request";
 ClientCrudService<Category> crudService = ClientCrudService<Category>.CrudComment;
 await crudService.InitializeRabbitConfiguration(routingKey, replyTo);
 bool toBeContinue = false;
-
+Console.WriteLine("Sync Console Client is ready ...");
 do
 {
 	Console.WriteLine("\n".PadRight(44, '-'));
